@@ -530,7 +530,7 @@
         <button class="lang-btn" id="btnEN" onclick="setLang('en')">英語<br>ABC</button>
       </div>
     </div>
-    <button class="translate-btn" onclick="translate()">▶ 点字に翻訳する</button>
+    <button class="translate-btn" onclick="runTranslate()">▶ 点字に翻訳する</button>
   </div>
 
   <div class="notice" id="notice"></div>
@@ -736,7 +736,7 @@ function getDotsForChar(ch, lang) {
   }
 }
 
-function translate() {
+function runTranslate() {
   const raw = document.getElementById('inputText').value.trim();
   if (!raw) {
     showNotice('テキストを入力してください。', 'warn');
@@ -914,7 +914,7 @@ function buildLegend() {
 document.getElementById('inputText').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    translate();
+    runTranslate();
   }
 });
 </script>
