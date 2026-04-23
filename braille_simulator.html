@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>点字翻訳シミュレーター</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Source+Code+Pro:wght@400;600&display=swap');
+
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f8f6f0;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --braille-bg: #0f172a;
+    --braille-fg: #e2e8f0;
+    --dot-active: #60a5fa;
+    --dot-inactive: #1e3a5f;
+    --border: #d1cfc8;
+    --muted: #6b7280;
+    --success: #059669;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--ink);
+    color: white;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 3px solid var(--accent);
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    padding: 8px;
+    background: var(--accent);
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .logo span {
+    width: 100%;
+    aspect-ratio: 1;
+    background: white;
+    border-radius: 50%;
+    opacity: 0.3;
+  }
+  .logo span.on { opacity: 1; }
+
+  header h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  header p {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
+
+  .badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    width: 100%;
+    flex: 1;
+  }
+
+  .steps {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 2rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .step-num {
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .step-arrow {
+    color: var(--border);
+    font-size: 1rem;
+  }
+
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  textarea {
+    flex: 1;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+    min-height: 80px;
+    background: var(--paper);
+    color: var(--ink);
+    transition: border-color 0.2s;
+    line-height: 1.7;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: white;
+  }
+
+  .lang-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lang-btn {
+    padding: 8px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--muted);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .lang-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .translate-btn {
+    display: block;
+    width: 100%;
+    padding: 0.85rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 1rem;
+  }
+
+  .translate-btn:hover { background: #1d4ed8; }
+  .translate-btn:active { transform: scale(0.99); }
+
+  /* 点字表示エリア */
+  .braille-result {
+    display: none;
+  }
+
+  .braille-result.visible {
+    display: block;
+  }
+
+  .capture-zone {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .result-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .input-display {
+    margin-bottom: 1.25rem;
+  }
+
+  .input-display-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .input-display-text {
+    font-size: 1rem;
+    color: var(--ink);
+    padding: 0.6rem 0.9rem;
+    background: var(--paper);
+    border-radius: 7px;
+    border-left: 3px solid var(--accent);
+    line-height: 1.6;
+    word-break: break-all;
+  }
+
+  .braille-section {
+    background: var(--braille-bg);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .braille-section-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .braille-chars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .braille-char-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .braille-cell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot-inactive);
+  }
+
+  .dot.filled {
+    background: var(--dot-active);
+    box-shadow: 0 0 4px rgba(96, 165, 250, 0.5);
+  }
+
+  .braille-unicode {
+    font-family: 'Noto Sans JP', monospace;
+    font-size: 2rem;
+    color: var(--dot-active);
+    line-height: 1;
+  }
+
+  .braille-label {
+    font-size: 0.65rem;
+    color: #64748b;
+    max-width: 40px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .braille-unicode-line {
+    background: var(--braille-bg);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 1.8rem;
+    color: var(--dot-active);
+    letter-spacing: 0.1em;
+    line-height: 2;
+    word-break: break-all;
+    margin-bottom: 1rem;
+  }
+
+  .grade-info {
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding: 0.6rem 0.9rem;
+    background: var(--accent-light);
+    border-radius: 7px;
+    line-height: 1.5;
+  }
+
+  /* 凡例 */
+  .legend-toggle {
+    font-size: 0.8rem;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 0;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  .legend {
+    display: none;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .legend.open { display: block; }
+
+  .legend h3 {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    color: var(--ink);
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+
+  .legend-unicode {
+    font-size: 1.3rem;
+    color: var(--accent);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  /* ダウンロードボタン */
+  .dl-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .dl-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.85rem;
+    color: var(--ink);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .dl-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .dl-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    background: white;
+  }
+
+  .notice {
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    color: #92400e;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .notice.visible { display: block; }
+
+  @media print {
+    header, .steps, .card, .legend-toggle, .legend, .dl-row, footer { display: none !important; }
+    .capture-zone { border: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="on"></span><span></span>
+    <span class="on"></span><span class="on"></span>
+    <span></span><span class="on"></span>
+  </div>
+  <div>
+    <h1>点字翻訳シミュレーター</h1>
+    <p>Braille Translation Simulator</p>
+  </div>
+  <span class="badge">演習ツール</span>
+</header>
+
+<main>
+
+  <div class="steps">
+    <div class="step">
+      <span class="step-num">1</span>
+      <span>テキスト入力</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step">
+      <span class="step-num">2</span>
+      <span>翻訳ボタンを押す</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step">
+      <span class="step-num">3</span>
+      <span>結果を確認</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step">
+      <span class="step-num">4</span>
+      <span>画像をダウンロード</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">① 入力テキスト</div>
+    <div class="input-row">
+      <textarea id="inputText" placeholder="日本語または英語を入力してください。例: こんにちは / Hello" rows="3"></textarea>
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="btnJP" onclick="setLang('jp')">日本語<br>かな</button>
+        <button class="lang-btn" id="btnEN" onclick="setLang('en')">英語<br>ABC</button>
+      </div>
+    </div>
+    <button class="translate-btn" onclick="runTranslate()">▶ 点字に翻訳する</button>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <button class="legend-toggle" onclick="toggleLegend()">▸ 点字の仕組みを見る（参考資料）</button>
+  <div class="legend" id="legend">
+    <h3>点字の基本構造（6点点字）</h3>
+    <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;">縦3行×横2列の6つの点の組み合わせで1文字を表現します。点に番号が振られており、それぞれの点の有無でパターンを作ります。</p>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;">点の番号配置</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;width:60px;">
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">①</div>
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">④</div>
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">②</div>
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">⑤</div>
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">③</div>
+          <div style="text-align:center;font-size:0.75rem;padding:4px;background:var(--paper);border-radius:4px;">⑥</div>
+        </div>
+      </div>
+      <div style="font-size:0.78rem;color:var(--muted);max-width:300px;line-height:1.7;">
+        6点の組み合わせで2<sup>6</sup>=64通りのパターンが作れます。<br>
+        日本語点字では50音をこの64パターンに対応させ、英語点字では同じパターンをアルファベットに対応させています。
+      </div>
+    </div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;">英語点字の例</div>
+    <div id="sampleLegend" class="legend-grid"></div>
+  </div>
+
+  <div class="braille-result" id="brailleResult">
+    <div class="capture-zone" id="captureZone">
+      <div class="result-header">
+        <span class="result-title">翻訳結果 / Translation Result</span>
+        <span class="result-meta" id="resultMeta"></span>
+      </div>
+
+      <div class="input-display">
+        <div class="input-display-label">入力テキスト</div>
+        <div class="input-display-text" id="displayInput"></div>
+      </div>
+
+      <div class="braille-section">
+        <div class="braille-section-label">点字表示（Unicode点字ブロック）</div>
+        <div id="brailleUnicodeDisplay" class="braille-unicode-line"></div>
+        <div class="braille-section-label" style="margin-top:1rem;">点の配置（各文字）</div>
+        <div class="braille-chars" id="brailleChars"></div>
+      </div>
+
+      <div class="grade-info" id="gradeInfo"></div>
+    </div>
+
+    <div class="dl-row">
+      <button class="dl-btn" onclick="downloadImage('png')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        PNG でダウンロード
+      </button>
+      <button class="dl-btn" onclick="downloadImage('jpg')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        JPG でダウンロード
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  点字翻訳シミュレーター ／ Braille Translation Simulator &nbsp;|&nbsp; 演習提出用ツール
+</footer>
+
+<script>
+// ===== 点字データ定義 =====
+
+// 英語点字（グレード1） a-z, 数字, 基本記号
+const EN_BRAILLE = {
+  'a': [1,0,0,0,0,0], 'b': [1,1,0,0,0,0], 'c': [1,0,0,1,0,0],
+  'd': [1,0,0,1,1,0], 'e': [1,0,0,0,1,0], 'f': [1,1,0,1,0,0],
+  'g': [1,1,0,1,1,0], 'h': [1,1,0,0,1,0], 'i': [0,1,0,1,0,0],
+  'j': [0,1,0,1,1,0], 'k': [1,0,1,0,0,0], 'l': [1,1,1,0,0,0],
+  'm': [1,0,1,1,0,0], 'n': [1,0,1,1,1,0], 'o': [1,0,1,0,1,0],
+  'p': [1,1,1,1,0,0], 'q': [1,1,1,1,1,0], 'r': [1,1,1,0,1,0],
+  's': [0,1,1,1,0,0], 't': [0,1,1,1,1,0], 'u': [1,0,1,0,0,1],
+  'v': [1,1,1,0,0,1], 'w': [0,1,0,1,1,1], 'x': [1,0,1,1,0,1],
+  'y': [1,0,1,1,1,1], 'z': [1,0,1,0,1,1],
+  '1': [1,0,0,0,0,0], '2': [1,1,0,0,0,0], '3': [1,0,0,1,0,0],
+  '4': [1,0,0,1,1,0], '5': [1,0,0,0,1,0], '6': [1,1,0,1,0,0],
+  '7': [1,1,0,1,1,0], '8': [1,1,0,0,1,0], '9': [0,1,0,1,0,0],
+  '0': [0,1,0,1,1,0],
+  ' ': [0,0,0,0,0,0], ',': [0,1,0,0,0,0], '.': [0,1,1,0,1,1],
+  '?': [0,1,1,0,0,1], '!': [0,1,1,0,1,0], ':': [0,1,0,0,1,0],
+  ';': [0,1,1,0,0,0], '-': [0,0,1,0,0,1],
+};
+
+// 日本語点字（ひらがな/カタカナ）
+const JP_BRAILLE = {
+  'あ': [1,0,0,0,0,0], 'い': [0,1,0,0,0,0], 'う': [1,1,0,0,0,0],
+  'え': [0,0,1,0,0,0], 'お': [1,0,1,0,0,0],
+  'か': [1,0,0,1,0,0], 'き': [0,1,0,1,0,0], 'く': [1,1,0,1,0,0],
+  'け': [0,0,1,1,0,0], 'こ': [1,0,1,1,0,0],
+  'さ': [1,0,0,0,1,0], 'し': [0,1,0,0,1,0], 'す': [1,1,0,0,1,0],
+  'せ': [0,0,1,0,1,0], 'そ': [1,0,1,0,1,0],
+  'た': [1,0,0,1,1,0], 'ち': [0,1,0,1,1,0], 'つ': [1,1,0,1,1,0],
+  'て': [0,0,1,1,1,0], 'と': [1,0,1,1,1,0],
+  'な': [1,0,0,0,0,1], 'に': [0,1,0,0,0,1], 'ぬ': [1,1,0,0,0,1],
+  'ね': [0,0,1,0,0,1], 'の': [1,0,1,0,0,1],
+  'は': [1,0,0,1,0,1], 'ひ': [0,1,0,1,0,1], 'ふ': [1,1,0,1,0,1],
+  'へ': [0,0,1,1,0,1], 'ほ': [1,0,1,1,0,1],
+  'ま': [1,0,0,0,1,1], 'み': [0,1,0,0,1,1], 'む': [1,1,0,0,1,1],
+  'め': [0,0,1,0,1,1], 'も': [1,0,1,0,1,1],
+  'や': [1,0,0,1,1,1], 'ゆ': [1,1,0,1,1,1], 'よ': [1,0,1,1,1,1],
+  'ら': [0,1,1,0,0,0], 'り': [0,0,0,1,0,0], 'る': [0,1,1,1,0,0],
+  'れ': [0,0,0,0,1,0], 'ろ': [0,1,1,0,1,0],
+  'わ': [0,1,1,1,1,0], 'を': [0,1,1,0,0,1], 'ん': [0,0,0,1,1,1],
+  'っ': [0,0,1,1,1,1], 'ー': [0,0,0,0,1,1], '、': [0,1,0,0,0,0],
+  '。': [0,1,1,0,1,1], '「': [0,0,0,1,1,0], '」': [0,0,1,0,0,0],
+  ' ': [0,0,0,0,0,0],
+  // 濁点・半濁点前置符
+  'が': [1,0,0,1,0,0], 'ぎ': [0,1,0,1,0,0], 'ぐ': [1,1,0,1,0,0],
+  'げ': [0,0,1,1,0,0], 'ご': [1,0,1,1,0,0],
+  'ざ': [1,0,0,0,1,0], 'じ': [0,1,0,0,1,0], 'ず': [1,1,0,0,1,0],
+  'ぜ': [0,0,1,0,1,0], 'ぞ': [1,0,1,0,1,0],
+  'だ': [1,0,0,1,1,0], 'ぢ': [0,1,0,1,1,0], 'づ': [1,1,0,1,1,0],
+  'で': [0,0,1,1,1,0], 'ど': [1,0,1,1,1,0],
+  'ば': [1,0,0,1,0,1], 'び': [0,1,0,1,0,1], 'ぶ': [1,1,0,1,0,1],
+  'べ': [0,0,1,1,0,1], 'ぼ': [1,0,1,1,0,1],
+  'ぱ': [1,0,0,1,0,1], 'ぴ': [0,1,0,1,0,1], 'ぷ': [1,1,0,1,0,1],
+  'ぺ': [0,0,1,1,0,1], 'ぽ': [1,0,1,1,0,1],
+};
+
+// 濁点処理用マッピング
+const DAKUTEN = {
+  'か':'が','き':'ぎ','く':'ぐ','け':'げ','こ':'ご',
+  'さ':'ざ','し':'じ','す':'ず','せ':'ぜ','そ':'ぞ',
+  'た':'だ','ち':'ぢ','つ':'づ','て':'で','と':'ど',
+  'は':'ば','ひ':'び','ふ':'ぶ','へ':'べ','ほ':'ぼ',
+};
+
+const HANDAKUTEN = {
+  'は':'ぱ','ひ':'ぴ','ふ':'ぷ','へ':'ぺ','ほ':'ぽ',
+};
+
+// 6点パターン → Unicode点字ブロック変換
+// Unicode点字: U+2800〜U+283F (6点), 実際は8点だが上位2点=0で6点として使用
+function dotsToUnicode(dots) {
+  // dots[0]=点1, dots[1]=点2, dots[2]=点3, dots[3]=点4, dots[4]=点5, dots[5]=点6
+  let val = 0x2800;
+  if (dots[0]) val |= 0x01; // 点1
+  if (dots[1]) val |= 0x02; // 点2
+  if (dots[2]) val |= 0x04; // 点3
+  if (dots[3]) val |= 0x08; // 点4
+  if (dots[4]) val |= 0x10; // 点5
+  if (dots[5]) val |= 0x20; // 点6
+  return String.fromCodePoint(val);
+}
+
+let currentLang = 'jp';
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('btnJP').classList.toggle('active', lang === 'jp');
+  document.getElementById('btnEN').classList.toggle('active', lang === 'en');
+  if (lang === 'jp') {
+    document.getElementById('inputText').placeholder = '日本語（ひらがな）を入力してください。例: こんにちは';
+  } else {
+    document.getElementById('inputText').placeholder = 'Enter English text. Example: Hello World';
+  }
+}
+
+function normalizeJP(text) {
+  // カタカナ → ひらがな
+  let result = '';
+  for (let ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0x30A1 && code <= 0x30F6) {
+      result += String.fromCharCode(code - 0x60);
+    } else {
+      result += ch;
+    }
+  }
+  // 濁点・半濁点の結合処理
+  let final = '';
+  for (let i = 0; i < result.length; i++) {
+    const ch = result[i];
+    const next = result[i+1];
+    if (next === '\u3099' || next === '\u309B') { // 濁点
+      if (DAKUTEN[ch]) { final += DAKUTEN[ch]; i++; continue; }
+    }
+    if (next === '\u309A' || next === '\u309C') { // 半濁点
+      if (HANDAKUTEN[ch]) { final += HANDAKUTEN[ch]; i++; continue; }
+    }
+    // NFD形式の合成済み文字対応
+    final += ch;
+  }
+  // NFC正規化後に再変換
+  return final;
+}
+
+function getDotsForChar(ch, lang) {
+  if (lang === 'en') {
+    const lower = ch.toLowerCase();
+    return EN_BRAILLE[lower] || null;
+  } else {
+    return JP_BRAILLE[ch] || null;
+  }
+}
+
+function runTranslate() {
+  const raw = document.getElementById('inputText').value.trim();
+  if (!raw) {
+    showNotice('テキストを入力してください。', 'warn');
+    return;
+  }
+
+  let text = raw;
+  if (currentLang === 'jp') {
+    text = normalizeJP(text);
+  }
+
+  const chars = [...text];
+  const results = [];
+  let unknownChars = [];
+
+  for (let ch of chars) {
+    const dots = getDotsForChar(ch, currentLang);
+    if (dots) {
+      results.push({ ch, dots, unicode: dotsToUnicode(dots) });
+    } else if (ch === '\n') {
+      results.push({ ch: '↵', dots: [0,0,0,0,0,0], unicode: dotsToUnicode([0,0,0,0,0,0]), isNewline: true });
+    } else {
+      unknownChars.push(ch);
+      results.push({ ch, dots: null, unicode: '？' });
+    }
+  }
+
+  // 結果表示
+  document.getElementById('displayInput').textContent = raw;
+
+  // Unicode1行表示
+  const unicodeLine = results.map(r => r.unicode).join('');
+  document.getElementById('brailleUnicodeDisplay').textContent = unicodeLine;
+
+  // 点セル表示
+  const container = document.getElementById('brailleChars');
+  container.innerHTML = '';
+  for (let r of results) {
+    const group = document.createElement('div');
+    group.className = 'braille-char-group';
+
+    if (r.dots) {
+      const cell = document.createElement('div');
+      cell.className = 'braille-cell';
+      // 点の配置: 1,4 / 2,5 / 3,6 → 列順で: 1,4,2,5,3,6
+      const order = [0, 3, 1, 4, 2, 5];
+      for (let idx of order) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (r.dots[idx] ? ' filled' : '');
+        cell.appendChild(dot);
+      }
+      group.appendChild(cell);
+
+      const uSpan = document.createElement('div');
+      uSpan.className = 'braille-unicode';
+      uSpan.textContent = r.unicode;
+      group.appendChild(uSpan);
+    } else {
+      const skip = document.createElement('div');
+      skip.style.cssText = 'width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#475569;';
+      skip.textContent = '—';
+      group.appendChild(skip);
+    }
+
+    const label = document.createElement('div');
+    label.className = 'braille-label';
+    label.textContent = r.ch;
+    group.appendChild(label);
+
+    container.appendChild(group);
+  }
+
+  // 補足情報
+  const meta = currentLang === 'jp' ? '日本語点字（6点式）' : '英語点字 Grade 1（6点式）';
+  document.getElementById('resultMeta').textContent = meta;
+  document.getElementById('gradeInfo').textContent =
+    currentLang === 'jp'
+      ? 'ℹ 日本語点字：縦3×横2の6点を使用。ひらがなを基本単位とし、濁音・拗音などもパターン化されています。変換できない文字は「—」で表示されます。'
+      : 'ℹ English Braille Grade 1: Uncontracted braille using the standard 6-dot cell. Each letter is represented independently. Unrecognized characters are shown as "—".';
+
+  const now = new Date();
+  // meta area に日時
+  document.getElementById('resultMeta').textContent =
+    meta + ' ／ ' + now.toLocaleDateString('ja-JP') + ' ' + now.toLocaleTimeString('ja-JP');
+
+  document.getElementById('brailleResult').classList.add('visible');
+  document.getElementById('brailleResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (unknownChars.length > 0) {
+    showNotice(`⚠ 以下の文字は点字データがないためスキップされました: ${[...new Set(unknownChars)].join(' ')}`, 'warn');
+  } else {
+    hideNotice();
+  }
+}
+
+function showNotice(msg, type) {
+  const el = document.getElementById('notice');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function hideNotice() {
+  document.getElementById('notice').classList.remove('visible');
+}
+
+async function downloadImage(format) {
+  const zone = document.getElementById('captureZone');
+  const btn = event.target.closest('.dl-btn');
+  btn.textContent = '処理中...';
+
+  try {
+    const canvas = await html2canvas(zone, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+
+    const link = document.createElement('a');
+    const now = new Date();
+    const ts = now.getFullYear() + ('0'+(now.getMonth()+1)).slice(-2) + ('0'+now.getDate()).slice(-2);
+    link.download = `braille_result_${ts}.${format}`;
+
+    if (format === 'jpg') {
+      link.href = canvas.toDataURL('image/jpeg', 0.92);
+    } else {
+      link.href = canvas.toDataURL('image/png');
+    }
+    link.click();
+  } catch(e) {
+    alert('ダウンロードに失敗しました: ' + e.message);
+  }
+
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>${format.toUpperCase()} でダウンロード`;
+}
+
+function toggleLegend() {
+  const el = document.getElementById('legend');
+  const btn = document.querySelector('.legend-toggle');
+  el.classList.toggle('open');
+  btn.textContent = el.classList.contains('open')
+    ? '▾ 点字の仕組みを閉じる'
+    : '▸ 点字の仕組みを見る（参考資料）';
+
+  if (el.classList.contains('open') && !el.dataset.built) {
+    buildLegend();
+    el.dataset.built = '1';
+  }
+}
+
+function buildLegend() {
+  const container = document.getElementById('sampleLegend');
+  const samples = 'abcdefghij'.split('');
+  for (let ch of samples) {
+    const dots = EN_BRAILLE[ch];
+    if (!dots) continue;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+
+    const uSpan = document.createElement('span');
+    uSpan.className = 'legend-unicode';
+    uSpan.textContent = dotsToUnicode(dots);
+
+    const label = document.createElement('span');
+    label.textContent = ch.toUpperCase() + ' ' + dots.map((d,i)=>d?i+1:'').filter(Boolean).join(',');
+    label.style.cssText = 'font-size:0.75rem;color:var(--muted);';
+
+    item.appendChild(uSpan);
+    item.appendChild(label);
+    container.appendChild(item);
+  }
+}
+
+// Enterキーで翻訳（Shift+Enterは改行）
+document.getElementById('inputText').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runTranslate();
+  }
+});
+</script>
+</body>
+</html>
